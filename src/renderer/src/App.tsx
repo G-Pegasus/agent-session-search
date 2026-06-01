@@ -91,7 +91,7 @@ export function App(): ReactElement {
     setResults(nextResults);
     setTags(nextTags);
     setStatus(nextStatus);
-    if (!selectedKey && nextResults[0]) setSelectedKey(nextResults[0].sessionKey);
+    if (selectedKey && !nextResults.some((session) => session.sessionKey === selectedKey)) setSelectedKey(null);
   }, [query, source, tag, visibility, selectedKey]);
 
   useEffect(() => {
@@ -112,13 +112,12 @@ export function App(): ReactElement {
   }, [load]);
 
   const selected = useMemo(
-    () => results.find((session) => session.sessionKey === selectedKey) || results[0] || null,
+    () => results.find((session) => session.sessionKey === selectedKey) || null,
     [results, selectedKey],
   );
 
   async function openDetail(session: SessionSearchResult): Promise<void> {
     setContextMenu(null);
-    setSelectedKey(session.sessionKey);
     setDetail(session);
     setMessages([]);
     setMessagesLoading(true);
@@ -306,6 +305,7 @@ export function App(): ReactElement {
               key={session.sessionKey}
               session={session}
               selected={selected?.sessionKey === session.sessionKey}
+              onSelect={() => setSelectedKey(session.sessionKey)}
               onOpen={() => void openDetail(session)}
               onContextMenu={(event) => {
                 event.preventDefault();
@@ -379,18 +379,21 @@ export function App(): ReactElement {
 function SessionRow({
   session,
   selected,
+  onSelect,
   onOpen,
   onContextMenu,
 }: {
   session: SessionSearchResult;
   selected: boolean;
+  onSelect: () => void;
   onOpen: () => void;
   onContextMenu: MouseEventHandler;
 }): ReactElement {
   return (
     <article
       className={`session-row ${selected ? "selected" : ""}`}
-      onClick={onOpen}
+      onClick={onSelect}
+      onDoubleClick={onOpen}
       onContextMenu={onContextMenu}
     >
       <div className="session-main">
