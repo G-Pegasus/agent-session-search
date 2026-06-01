@@ -1304,7 +1304,9 @@ function SettingsDialog({
             ) : null}
           </div>
         </div>
-        {feedback ? <div className={`settings-feedback ${feedback.kind}`}>{feedback.message}</div> : null}
+        <div className={`settings-feedback ${feedback?.kind ?? ""}`} aria-live="polite">
+          {feedback?.message ?? ""}
+        </div>
       </section>
     </div>
   );
