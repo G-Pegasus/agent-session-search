@@ -100,6 +100,35 @@ export interface SessionStats {
   };
 }
 
+export type UsageQuotaProvider = "codex" | "claude-code";
+export type UsageQuotaStatus = "supported" | "unsupported_api_key" | "not_configured" | "error";
+
+export interface UsageQuota {
+  key: string;
+  label: string;
+  usedPercent: number;
+  remainingPercent: number;
+  usedDisplay: string;
+  remainingDisplay: string;
+  resetsAt?: string;
+  stale?: boolean;
+}
+
+export interface UsageQuotaCard {
+  provider: UsageQuotaProvider;
+  displayName: string;
+  status: UsageQuotaStatus;
+  source?: string;
+  plan?: string;
+  quotas: UsageQuota[];
+  detail?: string;
+}
+
+export interface UsageQuotaSnapshot {
+  generatedAt: string;
+  providers: UsageQuotaCard[];
+}
+
 export interface ClaudeSessionIndexFile {
   sessionId: string;
   cwd: string;

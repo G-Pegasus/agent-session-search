@@ -1,4 +1,4 @@
-export type SidebarSectionId = "sources" | "projects" | "tags";
+export type SidebarSectionId = "views" | "sources" | "projects" | "tags";
 
 export type SidebarSectionsState = Record<SidebarSectionId, boolean>;
 
@@ -6,6 +6,7 @@ export const DEFAULT_SIDEBAR_SECTIONS: SidebarSectionsState = {
   projects: true,
   sources: true,
   tags: true,
+  views: true,
 };
 
 export function readSidebarSections(value: string | null): SidebarSectionsState {
@@ -16,6 +17,7 @@ export function readSidebarSections(value: string | null): SidebarSectionsState 
       projects: typeof parsed.projects === "boolean" ? parsed.projects : DEFAULT_SIDEBAR_SECTIONS.projects,
       sources: typeof parsed.sources === "boolean" ? parsed.sources : DEFAULT_SIDEBAR_SECTIONS.sources,
       tags: typeof parsed.tags === "boolean" ? parsed.tags : DEFAULT_SIDEBAR_SECTIONS.tags,
+      views: typeof parsed.views === "boolean" ? parsed.views : DEFAULT_SIDEBAR_SECTIONS.views,
     };
   } catch {
     return { ...DEFAULT_SIDEBAR_SECTIONS };

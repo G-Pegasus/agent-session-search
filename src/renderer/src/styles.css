@@ -351,6 +351,52 @@ select:focus-visible {
   text-transform: uppercase;
 }
 
+.stats-controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.stats-refresh {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--text-muted);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.stats-refresh:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.stats-refresh:disabled svg {
+  animation: spin 0.9s linear infinite;
+}
+
+.stats-feedback {
+  min-height: 14px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.stats-feedback.running {
+  color: var(--running-text);
+}
+
+.stats-feedback.success {
+  color: var(--success-text);
+}
+
+.stats-feedback.error {
+  color: var(--danger);
+}
+
 .stats-period-toggle {
   display: inline-flex;
   min-width: 0;
@@ -428,6 +474,205 @@ select:focus-visible {
   font-family: var(--mono);
   font-size: 10.5px;
   font-style: normal;
+}
+
+.quota-panel {
+  display: grid;
+  gap: 7px;
+  padding: 8px 0 10px;
+  margin: 0 0 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.quota-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px;
+  color: var(--text-muted);
+}
+
+.quota-header > div {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.quota-header span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.quota-header em {
+  color: var(--text-faint);
+  font-size: 10.5px;
+  font-style: normal;
+}
+
+.quota-refresh {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+  color: var(--text-muted);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.quota-refresh:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+
+.quota-refresh:disabled svg {
+  animation: spin 0.9s linear infinite;
+}
+
+.quota-list {
+  display: grid;
+  gap: 6px;
+}
+
+.quota-card {
+  --quota-accent: var(--accent);
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--panel-subtle);
+}
+
+.quota-card.codex {
+  --quota-accent: var(--codex);
+}
+
+.quota-card.claude-code {
+  --quota-accent: var(--claude);
+}
+
+.quota-provider-head,
+.quota-window-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.quota-provider-name {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quota-status {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--panel-bg);
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.quota-status.supported {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.quota-status.unsupported_api_key,
+.quota-status.not_configured {
+  background: var(--running-bg);
+  color: var(--running-text);
+}
+
+.quota-status.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.quota-meta {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quota-windows {
+  display: grid;
+  gap: 6px;
+}
+
+.quota-window {
+  display: grid;
+  gap: 4px;
+}
+
+.quota-window-top span {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.quota-window-top strong {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.quota-track {
+  overflow: hidden;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--panel-active);
+}
+
+.quota-fill {
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: var(--quota-accent);
+}
+
+.quota-reset,
+.quota-detail,
+.quota-empty,
+.quota-feedback {
+  color: var(--text-faint);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.quota-detail {
+  margin: 0;
+}
+
+.quota-empty,
+.quota-feedback {
+  padding: 0 8px;
+}
+
+.quota-feedback.running {
+  color: var(--running-text);
+}
+
+.quota-feedback.success {
+  color: var(--success-text);
+}
+
+.quota-feedback.error {
+  color: var(--danger);
 }
 
 .filter-title,

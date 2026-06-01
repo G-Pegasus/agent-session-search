@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { MouseEventHandler, ReactElement } from "react";
+import type { CSSProperties, MouseEventHandler, ReactElement } from "react";
 import {
   AppWindow,
   Archive,
@@ -40,6 +40,8 @@ import type {
   SessionSource,
   SessionStats,
   SessionStatsPeriod,
+  UsageQuotaCard,
+  UsageQuotaSnapshot,
 } from "../../core/types";
 import { formatCompactNumber, formatTokenCount } from "./format-count";
 import {
@@ -121,6 +123,11 @@ const EMPTY_STATS: SessionStats = {
   },
 };
 
+const EMPTY_QUOTAS: UsageQuotaSnapshot = {
+  generatedAt: "",
+  providers: [],
+};
+
 function isBranchTag(tagName: string): boolean {
   return tagName.startsWith("branch:");
 }
@@ -131,6 +138,8 @@ type ActionStatus = {
 };
 
 type RefreshFeedback = ActionStatus | null;
+type StatsFeedback = ActionStatus | null;
+type QuotaFeedback = ActionStatus | null;
 type SettingsFeedback = ActionStatus | null;
 
 interface ContextMenuState {
@@ -168,6 +177,11 @@ export function App(): ReactElement {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [stats, setStats] = useState<SessionStats>(EMPTY_STATS);
   const [statsPeriod, setStatsPeriod] = useState<SessionStatsPeriod>("today");
+  const [statsRefreshing, setStatsRefreshing] = useState(false);
+  const [statsFeedback, setStatsFeedback] = useState<StatsFeedback>(null);
+  const [quotas, setQuotas] = useState<UsageQuotaSnapshot>(EMPTY_QUOTAS);
+  const [quotaLoading, setQuotaLoading] = useState(false);
+  const [quotaFeedback, setQuotaFeedback] = useState<QuotaFeedback>(null);
   const [indexStatus, setIndexStatus] = useState<IndexStatus | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [detail, setDetail] = useState<SessionSearchResult | null>(null);
@@ -213,10 +227,51 @@ export function App(): ReactElement {
     );
   }, [query, source, tag, projectPath, visibility, sortBy, statsPeriod]);
 
+  const refreshStats = useCallback(async () => {
+    setStatsRefreshing(true);
+    setStatsFeedback({ kind: "running", message: "Refreshing usage..." });
+    try {
+      setStats(await window.sessionSearch.getStats({ period: statsPeriod }));
+      const successMessage = "Usage refreshed.";
+      setStatsFeedback({ kind: "success", message: successMessage });
+      window.setTimeout(() => {
+        setStatsFeedback((current) => (current?.kind === "success" && current.message === successMessage ? null : current));
+      }, 1600);
+    } catch (error) {
+      setStatsFeedback({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setStatsRefreshing(false);
+    }
+  }, [statsPeriod]);
+
+  const loadQuotas = useCallback(async (manual = false) => {
+    setQuotaLoading(true);
+    if (manual) setQuotaFeedback({ kind: "running", message: "Refreshing usage limits..." });
+    try {
+      const nextQuotas = await window.sessionSearch.getQuotas();
+      setQuotas(nextQuotas);
+      if (manual) {
+        const successMessage = "Usage limits refreshed.";
+        setQuotaFeedback({ kind: "success", message: successMessage });
+        window.setTimeout(() => {
+          setQuotaFeedback((current) => (current?.kind === "success" && current.message === successMessage ? null : current));
+        }, 1800);
+      }
+    } catch (error) {
+      setQuotaFeedback({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setQuotaLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 120);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    void loadQuotas();
+  }, [loadQuotas]);
 
   useEffect(() => {
     void window.sessionSearch.getSettings().then(setAppSettings);
@@ -531,15 +586,15 @@ export function App(): ReactElement {
             <Search size={17} />
           </div>
           <div>
-            <h1>Agent-Session-Search</h1>
-            <p>AI agent session console</p>
+            <h1>Agent Session Search</h1>
+            <p>Codex and Claude Code</p>
           </div>
         </div>
 
         <div className="refresh-control">
           <button className={`primary ${indexStatus?.running ? "is-running" : ""}`} onClick={() => void refreshNow()} disabled={indexStatus?.running}>
             <RefreshCw size={16} />
-            {indexStatus?.running ? "Refreshing..." : "Refresh Now"}
+            {indexStatus?.running ? "Refreshing Index..." : "Refresh Index"}
           </button>
           {refreshFeedback ? <div className={`refresh-feedback ${refreshFeedback.kind}`}>{refreshFeedback.message}</div> : null}
         </div>
@@ -547,18 +602,30 @@ export function App(): ReactElement {
         <div className="stats-panel">
           <div className="stats-header">
             <span>Usage</span>
-            <div className="stats-period-toggle" role="group" aria-label="Usage period">
-              {STATS_PERIOD_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  className={statsPeriod === option.value ? "active" : ""}
-                  onClick={() => setStatsPeriod(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <div className="stats-controls">
+              <div className="stats-period-toggle" role="group" aria-label="Usage period">
+                {STATS_PERIOD_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    className={statsPeriod === option.value ? "active" : ""}
+                    onClick={() => setStatsPeriod(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="stats-refresh"
+                onClick={() => void refreshStats()}
+                disabled={statsRefreshing}
+                title="Refresh usage stats"
+                aria-label="Refresh usage stats"
+              >
+                <RefreshCw size={13} />
+              </button>
             </div>
           </div>
+          {statsFeedback ? <div className={`stats-feedback ${statsFeedback.kind}`}>{statsFeedback.message}</div> : null}
           <div className="stats-metrics">
             <span>
               <strong>{formatCompactNumber(stats.total.messageCount)}</strong>
@@ -581,23 +648,33 @@ export function App(): ReactElement {
           </div>
         </div>
 
-        <nav className="nav-group">
-          <button className={visibility === "default" ? "active" : ""} onClick={() => setVisibility("default")}>
-            All
-          </button>
-          <button className={visibility === "favorites" ? "active" : ""} onClick={() => setVisibility("favorites")}>
-            <Star size={14} />
-            Favorites
-          </button>
-          <button className={visibility === "pinned" ? "active" : ""} onClick={() => setVisibility("pinned")}>
-            <Pin size={14} />
-            Pinned
-          </button>
-          <button className={visibility === "hidden" ? "active" : ""} onClick={() => setVisibility("hidden")}>
-            <EyeOff size={14} />
-            Hidden
-          </button>
-        </nav>
+        <QuotaPanel
+          snapshot={quotas}
+          loading={quotaLoading}
+          feedback={quotaFeedback}
+          onRefresh={() => void loadQuotas(true)}
+        />
+
+        <SidebarSectionHeader title="Views" expanded={sidebarSections.views} onToggle={() => toggleSidebarSectionById("views")} />
+        {sidebarSections.views ? (
+          <nav className="nav-group">
+            <button className={visibility === "default" ? "active" : ""} onClick={() => setVisibility("default")}>
+              All
+            </button>
+            <button className={visibility === "favorites" ? "active" : ""} onClick={() => setVisibility("favorites")}>
+              <Star size={14} />
+              Favorites
+            </button>
+            <button className={visibility === "pinned" ? "active" : ""} onClick={() => setVisibility("pinned")}>
+              <Pin size={14} />
+              Pinned
+            </button>
+            <button className={visibility === "hidden" ? "active" : ""} onClick={() => setVisibility("hidden")}>
+              <EyeOff size={14} />
+              Hidden
+            </button>
+          </nav>
+        ) : null}
 
         <SidebarSectionHeader title="Sources" expanded={sidebarSections.sources} onToggle={() => toggleSidebarSectionById("sources")} />
         {sidebarSections.sources ? (
@@ -857,6 +934,72 @@ export function App(): ReactElement {
         />
       ) : null}
     </main>
+  );
+}
+
+function QuotaPanel({
+  snapshot,
+  loading,
+  feedback,
+  onRefresh,
+}: {
+  snapshot: UsageQuotaSnapshot;
+  loading: boolean;
+  feedback: QuotaFeedback;
+  onRefresh: () => void;
+}): ReactElement {
+  const updatedAt = snapshot.generatedAt ? formatRelativeTime(Date.parse(snapshot.generatedAt)) : "";
+  return (
+    <div className="quota-panel">
+      <div className="quota-header">
+        <div>
+          <span>Remaining</span>
+          {updatedAt ? <em>{updatedAt}</em> : null}
+        </div>
+        <button className="quota-refresh" onClick={onRefresh} disabled={loading} title="Refresh usage limits" aria-label="Refresh usage limits">
+          <RefreshCw size={13} />
+        </button>
+      </div>
+      <div className="quota-list">
+        {snapshot.providers.map((card) => (
+          <QuotaProviderCard key={card.provider} card={card} />
+        ))}
+        {snapshot.providers.length === 0 ? <div className="quota-empty">{loading ? "Checking usage limits..." : "Usage limits unavailable."}</div> : null}
+      </div>
+      {feedback ? <div className={`quota-feedback ${feedback.kind}`}>{feedback.message}</div> : null}
+    </div>
+  );
+}
+
+function QuotaProviderCard({ card }: { card: UsageQuotaCard }): ReactElement {
+  const supported = card.status === "supported" && card.quotas.length > 0;
+  const meta = card.plan;
+  return (
+    <div className={`quota-card ${card.provider}`}>
+      <div className="quota-provider-head">
+        <span className="quota-provider-name">{card.displayName}</span>
+        <span className={`quota-status ${card.status}`}>{quotaStatusLabel(card.status)}</span>
+      </div>
+      {meta ? <div className="quota-meta">{meta}</div> : null}
+      {supported ? (
+        <div className="quota-windows">
+          {card.quotas.map((quota) => (
+            <div className="quota-window" key={quota.key}>
+              <div className="quota-window-top">
+                <span>{quota.label}</span>
+                <strong>{quota.remainingDisplay} left</strong>
+              </div>
+              <div className="quota-track" aria-hidden="true">
+                <div className="quota-fill" style={{ width: `${quota.remainingPercent}%` } as CSSProperties} />
+              </div>
+              <div className="quota-reset">{quota.stale ? "stale" : formatQuotaReset(quota.resetsAt)}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="quota-detail">{card.detail || "Quota data unavailable."}</p>
+      )}
+    </div>
   );
 }
 
@@ -1424,4 +1567,28 @@ function CommandDialog({
       </form>
     </div>
   );
+}
+
+function quotaStatusLabel(status: UsageQuotaCard["status"]): string {
+  if (status === "supported") return "Live";
+  if (status === "unsupported_api_key") return "Unsupported";
+  if (status === "error") return "Error";
+  return "Setup";
+}
+
+function formatQuotaReset(resetsAt?: string): string {
+  if (!resetsAt) return "";
+  const timestamp = Date.parse(resetsAt);
+  if (!Number.isFinite(timestamp)) return "";
+  const diff = timestamp - Date.now();
+  if (diff <= 0) return "reset due";
+  const minutes = Math.ceil(diff / 60_000);
+  if (minutes < 60) return `resets in ${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const remainingMinutes = minutes - hours * 60;
+    return remainingMinutes > 0 ? `resets in ${hours}h ${remainingMinutes}m` : `resets in ${hours}h`;
+  }
+  const days = Math.ceil(hours / 24);
+  return `resets in ${days}d`;
 }

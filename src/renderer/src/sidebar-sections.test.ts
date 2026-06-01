@@ -7,6 +7,7 @@ describe("sidebar sections", () => {
       projects: true,
       sources: true,
       tags: true,
+      views: true,
     });
   });
 
@@ -15,6 +16,7 @@ describe("sidebar sections", () => {
       projects: false,
       sources: true,
       tags: true,
+      views: true,
     });
   });
 
@@ -23,13 +25,14 @@ describe("sidebar sections", () => {
       projects: true,
       sources: true,
       tags: true,
+      views: true,
     });
   });
 
   it("toggles one section without mutating the other sections", () => {
-    const next = toggleSidebarSection({ projects: true, sources: true, tags: false }, "tags");
+    const next = toggleSidebarSection({ projects: true, sources: true, tags: false, views: true }, "tags");
 
-    expect(next).toEqual({ projects: true, sources: true, tags: true });
+    expect(next).toEqual({ projects: true, sources: true, tags: true, views: true });
     expect(JSON.parse(serializeSidebarSections(next))).toEqual(next);
   });
 });
