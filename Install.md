@@ -16,6 +16,8 @@ agent-session-search
 
 应用启动后常驻后台（菜单栏有图标），随时按 **⌥ Option + Space** 唤起搜索窗口。
 
+> ⚠️ **请勿删除或移动这个仓库目录。** `npm install -g .` 注册的全局命令是一个指向本仓库的符号链接（npm 对本地目录安装的默认行为），它在运行时会从仓库内的 `node_modules` 加载 Electron 与构建产物 `out/`。如果之后删除、改名或移动了仓库，全局 `agent-session-search` 命令会因为链接失效而无法启动。需要换位置时，请在新位置重新执行一次安装命令。
+
 ### 要求
 
 - macOS
