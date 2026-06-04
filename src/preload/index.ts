@@ -44,6 +44,7 @@ const api = {
   listSkills: (): Promise<InstalledSkillsSnapshot> => ipcRenderer.invoke("skills:list"),
   copySkillPath: (skillPath: string): Promise<void> => ipcRenderer.invoke("skills:copy-path", skillPath),
   revealSkill: (skillPath: string): Promise<void> => ipcRenderer.invoke("skills:reveal", skillPath),
+  getSkillUsageHookStatus: (): Promise<boolean> => ipcRenderer.invoke("skills:usage-hook-status"),
   installSkillUsageHook: (): Promise<string> => ipcRenderer.invoke("skills:install-usage-hook"),
   uninstallSkillUsageHook: (): Promise<string> => ipcRenderer.invoke("skills:uninstall-usage-hook"),
   copyResumeCommand: (sessionKey: string): Promise<void> => ipcRenderer.invoke("command:copy-resume", sessionKey),

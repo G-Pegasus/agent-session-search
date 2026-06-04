@@ -479,6 +479,13 @@ function registerIpc(): void {
   ipcMain.handle("skills:reveal", async (_event, skillPath: string) => {
     await revealInFileManager(skillPath);
   });
+  ipcMain.handle("skills:usage-hook-status", () => {
+    try {
+      return loadSkillUsageHookSetup().skillUsageHookStatus().installed;
+    } catch {
+      return false;
+    }
+  });
   ipcMain.handle("skills:install-usage-hook", () => {
     const result = loadSkillUsageHookSetup().installSkillUsageHook();
     if (result.status === "error") throw new Error(result.detail || "Could not configure the skill usage hook.");
