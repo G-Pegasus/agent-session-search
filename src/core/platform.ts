@@ -192,20 +192,29 @@ export interface WindowsLaunch {
 }
 
 // Ordered candidate launches. The caller tries each until one spawns (ENOENT -> next).
-export function buildWindowsLaunchPlan(terminal: TerminalChoice, command: string, cwd: string): WindowsLaunch[] {
+export function buildWindowsLaunchPlan(
+  terminal: TerminalChoice,
+  cmdCommand: string,
+  cwd: string,
+  powershellCommand?: string,
+): WindowsLaunch[] {
   const wt = (): WindowsLaunch => {
-    const inner = ["cmd.exe", "/d", "/k", command];
+    const inner = ["cmd.exe", "/d", "/k", cmdCommand];
     return { file: "wt.exe", args: cwd ? ["-d", cwd, ...inner] : inner };
   };
-  const pwsh = (): WindowsLaunch => ({ file: "pwsh.exe", args: ["-NoLogo", "-NoProfile", "-NoExit", "-Command", command], cwd: cwd || undefined });
-  const powershell = (): WindowsLaunch => ({
-    file: "powershell.exe",
-    args: ["-NoLogo", "-NoProfile", "-NoExit", "-Command", command],
+  const pwsh = (): WindowsLaunch => ({
+    file: "pwsh.exe",
+    args: ["-NoLogo", "-NoProfile", "-NoExit", "-Command", powershellCommand ?? cmdCommand],
     cwd: cwd || undefined,
   });
-  const cmd = (): WindowsLaunch => ({ file: "cmd.exe", args: ["/d", "/k", command], cwd: cwd || undefined });
+  const powershell = (): WindowsLaunch => ({
+    file: "powershell.exe",
+    args: ["-NoLogo", "-NoProfile", "-NoExit", "-Command", powershellCommand ?? cmdCommand],
+    cwd: cwd || undefined,
+  });
+  const cmd = (): WindowsLaunch => ({ file: "cmd.exe", args: ["/d", "/k", cmdCommand], cwd: cwd || undefined });
   const wezterm = (): WindowsLaunch => {
-    const inner = ["cmd.exe", "/d", "/k", command];
+    const inner = ["cmd.exe", "/d", "/k", cmdCommand];
     return { file: "wezterm.exe", args: cwd ? ["start", "--cwd", cwd, "--", ...inner] : ["start", "--", ...inner] };
   };
 
@@ -265,15 +274,17 @@ export function buildWindowsResumeLaunchPlan(
     sshTarget: opts.sshTarget,
     sshArgs: opts.sshArgs,
   });
+  const powershellCommand = sshArgs
+    ? getResumePowerShellCommand(session, settings, { ...opts, sshArgs })
+    : getResumeCommand(session, { ...settings, defaultTerminal: "PowerShell" }, {
+        withCwd: true,
+        skipPermissions: opts.skipPermissions,
+        platform,
+      });
   const terminal = normalizeTerminal(opts.terminal ?? settings.defaultTerminal, "win32");
   const cwd = sshArgs ? "" : existingDirectory(session.projectPath);
-  if (!sshArgs) return buildWindowsLaunchPlan(terminal, cmdCommand, cwd);
-  return buildWindowsShellSpecificLaunchPlan(
-    terminal,
-    cmdCommand,
-    getResumePowerShellCommand(session, settings, { ...opts, sshArgs }),
-    cwd,
-  );
+  if (!sshArgs) return buildWindowsLaunchPlan(terminal, cmdCommand, cwd, powershellCommand);
+  return buildWindowsShellSpecificLaunchPlan(terminal, cmdCommand, powershellCommand, cwd);
 }
 
 async function openResumeInWindowsTerminal(

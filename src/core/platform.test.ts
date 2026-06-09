@@ -238,12 +238,12 @@ describe("terminal options per platform", () => {
   it("returns macOS terminals elsewhere", () => {
     expect(terminalOptionsFor("darwin")).toEqual(["Terminal", "iTerm", "Ghostty", "WezTerm", "Warp"]);
   });
-  it("defaults to WindowsTerminal on win32 and Terminal on macOS", () => {
-    expect(defaultTerminalFor("win32")).toBe("WindowsTerminal");
+  it("defaults to PowerShell on win32 and Terminal on macOS", () => {
+    expect(defaultTerminalFor("win32")).toBe("PowerShell");
     expect(defaultTerminalFor("darwin")).toBe("Terminal");
   });
   it("normalizes a cross-platform value to the platform default", () => {
-    expect(normalizeTerminal("Terminal", "win32")).toBe("WindowsTerminal");
+    expect(normalizeTerminal("WindowsTerminal", "darwin")).toBe("Terminal");
     expect(normalizeTerminal("Cmd", "darwin")).toBe("Terminal");
     expect(normalizeTerminal("PowerShell", "win32")).toBe("PowerShell");
   });
