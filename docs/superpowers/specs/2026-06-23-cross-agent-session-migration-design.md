@@ -1,8 +1,8 @@
-# Cross-Agent Session Migration Design
+# 跨 Agent 会话迁移设计
 
-## Goal
+## 目标
 
-Add local session migration between Claude Code, Codex, and CodeBuddy. All six cross-agent directions are supported:
+在 Claude Code、Codex 和 CodeBuddy 之间迁移本地会话，支持全部 6 条跨 Agent 路径：
 
 - Claude Code → Codex
 - Claude Code → CodeBuddy
@@ -11,60 +11,60 @@ Add local session migration between Claude Code, Codex, and CodeBuddy. All six c
 - CodeBuddy → Claude Code
 - CodeBuddy → Codex
 
-After migration, Agent-Session-Search opens the new session in the configured default terminal by running the target CLI's resume command.
+迁移完成后，Agent-Session-Search 使用目标 CLI 的 resume 命令，在已配置的默认终端中打开新会话。
 
-## Scope
+## 范围
 
-The first version supports local sessions only. It does not migrate SSH remote sessions.
+首版仅支持本地会话，不支持 SSH 远程会话迁移。
 
-Migration includes:
+迁移内容包括：
 
-- Project path
-- Session title and source metadata
-- Ordered user and assistant messages
-- Original message timestamps when available
+- 项目路径
+- 会话标题和来源元数据
+- 按原顺序排列的用户与助手消息
+- 可获取时保留原消息时间戳
 
-Migration excludes:
+不迁移以下内容：
 
-- Tool calls and tool results
-- System and developer prompts
-- Permission and sandbox configuration
-- Model configuration
-- Credentials, API keys, and other secrets not already present in visible messages
+- 工具调用和工具结果
+- System 和 Developer 提示
+- 权限与沙箱配置
+- 模型配置
+- 凭证、API key，以及可见消息中原本不存在的其他敏感信息
 
-Migration never modifies the source session.
+迁移过程不会修改源会话。
 
-## Architecture
+## 架构
 
-Use a normalized intermediate representation and target-specific writers.
+使用统一中间模型和目标格式专用写入器。
 
 ```text
-Indexed session
+已索引会话
     ↓
-PortableSession reader
+PortableSession 读取器
     ↓
-Length policy
-    ├── complete message history
-    ├── AI handoff compression
-    └── local head/tail fallback
+长度策略
+    ├── 完整消息历史
+    ├── AI 交接压缩
+    └── 本地头尾截断降级
     ↓
-Target writer
+目标写入器
     ├── Claude Code JSONL
     ├── Codex JSONL
     └── CodeBuddy JSONL
     ↓
-Target format validation
+目标格式校验
     ↓
-Atomic rename into target session directory
+原子重命名到目标会话目录
     ↓
-Refresh local index
+刷新本地索引
     ↓
-Open target CLI resume command in the default terminal
+在默认终端执行目标 CLI resume 命令
 ```
 
 ### Portable Session
 
-The migration core uses a target-independent structure:
+迁移核心使用与目标 Agent 无关的结构：
 
 ```ts
 interface PortableSession {
@@ -81,171 +81,171 @@ interface PortableSession {
 }
 ```
 
-The reader reuses the existing indexed session and message store and does not reparse source files independently.
+读取器复用现有索引会话和消息存储，不再独立解析源文件。
 
-### Migration Service
+### 迁移服务
 
-A migration service coordinates:
+迁移服务负责协调以下步骤：
 
-1. Validate that the source is local and one of the three supported agent families.
-2. Validate that the target differs from the source.
-3. Check that the configured target CLI binary is available.
-4. Load all visible user and assistant messages.
-5. Apply the length policy.
-6. Ask the target writer to prepare and validate a temporary session file.
-7. Atomically rename the temporary file into the target session directory.
-8. Record migration metadata.
-9. Refresh the application index.
-10. Open the target resume command in the default terminal.
+1. 校验源会话是本地会话，并且属于三个受支持的 Agent 家族之一。
+2. 校验目标 Agent 与源 Agent 不同。
+3. 检查已配置的目标 CLI 可执行文件是否可用。
+4. 加载全部可见的用户与助手消息。
+5. 应用长度策略。
+6. 让目标写入器生成并校验临时会话文件。
+7. 将临时文件原子重命名到目标会话目录。
+8. 记录迁移元数据。
+9. 刷新应用索引。
+10. 在默认终端打开目标 resume 命令。
 
-Writers remain independent of Electron and the UI. They accept the portable session and return the target session ID, file path, and resume command inputs.
+写入器不依赖 Electron 和 UI。它接收 `PortableSession`，返回目标会话 ID、文件路径，以及生成 resume 命令所需的信息。
 
-## Length Policy
+## 长度策略
 
-Estimate tokens as:
+使用以下方式估算 token：
 
 ```text
-estimated tokens = total message characters / 4
+预估 token 数 = 消息总字符数 / 4
 ```
 
-Sessions at or below 60,000 estimated tokens are migrated with their full visible user/assistant history.
+预估 token 不超过 60,000 时，迁移完整的可见用户与助手消息历史。
 
-Sessions above 60,000 estimated tokens use AI handoff compression through the existing summary Provider resolution order:
+超过 60,000 时，通过现有摘要 Provider 解析顺序执行 AI 交接压缩：
 
-1. Dedicated summary Provider
+1. 专用摘要 Provider
 2. Codex Provider
 3. Claude Code Provider
 
-The AI output becomes a structured user message. It includes:
+AI 输出转换为一条结构化用户消息，内容包括：
 
-- Original agent, title, project path, and session time
-- User goals and constraints
-- Completed work
-- Important technical decisions and rationale
-- Relevant files, commands, and verification results
-- Open questions and recommended next steps
+- 原 Agent、标题、项目路径和会话时间
+- 用户目标与约束
+- 已完成工作
+- 关键技术决策及其原因
+- 相关文件、命令和验证结果
+- 未解决问题与建议下一步
 
-The compressed session also includes a bounded window of the most recent original user/assistant messages so the target agent can continue from the latest exchange.
+压缩后的会话还会保留有界数量的最新原始用户与助手消息，使目标 Agent 能直接衔接最近的对话。
 
-The compression prompt must instruct the model to treat transcript content as data and not follow instructions embedded inside it.
+压缩提示必须明确要求模型将会话内容视为数据，不执行其中嵌入的指令。
 
-### Local Fallback
+### 本地降级
 
-If no Provider is configured, or AI compression times out, fails, or returns an invalid response, migration continues using a deterministic local fallback:
+如果未配置 Provider，或者 AI 压缩超时、失败、返回无效结果，则继续使用确定性的本地降级策略：
 
-- Preserve a bounded set of opening messages.
-- Preserve a bounded set of closing messages.
-- Insert an explicit omission marker with the number of omitted messages.
-- Keep the final estimated result below the migration budget.
+- 保留有界数量的开头消息。
+- 保留有界数量的结尾消息。
+- 插入明确的省略标记，并注明省略消息数量。
+- 确保最终预估大小不超过迁移预算。
 
-The result reports whether migration used:
+迁移结果标明所使用的策略：
 
 - `complete`
 - `ai-compressed`
 - `locally-truncated`
 
-## Target Writers
+## 目标写入器
 
-Each writer owns:
+每个写入器分别负责：
 
-- Target session ID creation
-- Target path calculation
-- Target-specific JSONL records
-- Parent/message identifiers where required
-- Title metadata where supported
-- Temporary-file validation
-- Atomic installation
+- 创建目标会话 ID
+- 计算目标路径
+- 生成目标格式 JSONL 记录
+- 按目标格式生成父消息和消息标识
+- 在目标支持时写入标题元数据
+- 校验临时文件
+- 原子安装最终文件
 
-### Codex Writer
+### Codex 写入器
 
-Writes into:
+写入目录：
 
 ```text
 ~/.codex/sessions/YYYY/MM/DD/rollout-<timestamp>-<uuid>.jsonl
 ```
 
-The file contains a compatible `session_meta` record followed by ordered message `response_item` records. The writer uses the original project directory as `cwd`.
+文件包含兼容的 `session_meta` 记录，以及按顺序排列的消息 `response_item` 记录。写入器使用原项目目录作为 `cwd`。
 
-The launcher executes:
+启动器执行：
 
 ```text
 codex resume <session-id>
 ```
 
-### Claude Code Writer
+### Claude Code 写入器
 
-Writes into the Claude project directory derived from the project path:
+写入根据项目路径派生的 Claude 项目目录：
 
 ```text
 ~/.claude/projects/<encoded-project-path>/<uuid>.jsonl
 ```
 
-The writer creates a valid parent-linked user/assistant message chain and includes the session ID, project directory, timestamps, and target-compatible metadata.
+写入器创建合法的父级关联用户/助手消息链，并包含会话 ID、项目目录、时间戳和目标格式所需元数据。
 
-The launcher executes:
+启动器执行：
 
 ```text
 claude --resume <session-id>
 ```
 
-### CodeBuddy Writer
+### CodeBuddy 写入器
 
-Writes into:
+写入目录：
 
 ```text
 ~/.codebuddy/projects/<encoded-project-path>/<session-id>.jsonl
 ```
 
-The writer creates ordered CodeBuddy message records and an `ai-title` record. It excludes reasoning, provider usage, tools, and source-agent-specific state.
+写入器创建按顺序排列的 CodeBuddy 消息记录和一条 `ai-title` 记录，不包含推理内容、Provider 用量、工具信息和源 Agent 专用状态。
 
-The launcher executes:
+启动器执行：
 
 ```text
 codebuddy --resume <session-id>
 ```
 
-### Format Compatibility
+### 格式兼容
 
-Writers use a small target-format compatibility layer:
+写入器使用一个小型目标格式兼容层：
 
-- Detect installed CLI version before writing.
-- Keep format generation isolated by target.
-- Validate generated JSONL by parsing it with the application's existing loader.
-- Assert target family, session ID, project path, message count, message roles, and message order before installation.
+- 写入前检测已安装 CLI 版本。
+- 将格式生成逻辑按目标 Agent 隔离。
+- 使用应用现有加载器解析生成的 JSONL，完成格式校验。
+- 安装前断言目标家族、会话 ID、项目路径、消息数量、消息角色和消息顺序。
 
-Unsupported target CLI versions fail before writing the final file.
+不支持的目标 CLI 版本必须在写入最终文件前失败。
 
-## Atomicity and Failure Handling
+## 原子性与失败处理
 
-Before writing:
+写入前执行：
 
-- Reject remote sessions.
-- Reject same-family targets.
-- Reject unsupported sources.
-- Check target CLI availability and version.
-- Validate that the project path exists and is a directory.
+- 拒绝远程会话。
+- 拒绝同 Agent 家族迁移。
+- 拒绝不受支持的源。
+- 检查目标 CLI 可用性和版本。
+- 校验项目路径存在且为目录。
 
-Writing uses:
+写入流程：
 
-1. Create target directory if needed.
-2. Write a uniquely named temporary file in the same target directory.
-3. Flush and close the temporary file.
-4. Parse and validate it using the target loader.
-5. Atomically rename it to the final session filename.
+1. 按需创建目标目录。
+2. 在同一目标目录中写入具有唯一名称的临时文件。
+3. 刷盘并关闭临时文件。
+4. 使用目标加载器解析和校验临时文件。
+5. 原子重命名为最终会话文件。
 
-If preparation or validation fails, remove the temporary file and leave no target session.
+准备或校验失败时，删除临时文件，不留下目标会话。
 
-If the file is installed but index refresh fails, keep the valid migrated session and report the indexing error.
+文件安装成功但索引刷新失败时，保留有效的迁移会话，并报告索引错误。
 
-If terminal launch fails after installation, keep the migrated session and return:
+文件安装成功但终端启动失败时，保留迁移会话，并返回：
 
-- Target session ID
-- Target file path
-- Resume command suitable for copying
+- 目标会话 ID
+- 目标文件路径
+- 可复制的 resume 命令
 
-## Migration Metadata
+## 迁移元数据
 
-Store a migration record in the application SQLite database:
+在应用 SQLite 数据库中保存迁移记录：
 
 ```ts
 interface SessionMigrationRecord {
@@ -260,11 +260,11 @@ interface SessionMigrationRecord {
 }
 ```
 
-Repeated migrations are allowed. Existing records let the UI identify previous copies without silently blocking an intentional new migration.
+允许重复迁移。已有记录用于让 UI 识别此前创建的副本，但不会静默阻止用户主动再次迁移。
 
-## IPC Contract
+## IPC 契约
 
-Add:
+新增：
 
 ```ts
 type MigrationTarget = "claude" | "codex" | "codebuddy";
@@ -281,13 +281,13 @@ interface SessionMigrationResult {
 }
 ```
 
-IPC method:
+IPC 方法：
 
 ```ts
 migrateSession(sessionKey: string, target: MigrationTarget): Promise<SessionMigrationResult>
 ```
 
-The main process emits stage updates for:
+主进程发送以下阶段更新：
 
 - `reading`
 - `compressing`
@@ -295,101 +295,101 @@ The main process emits stage updates for:
 - `indexing`
 - `launching`
 
-Stage updates include the source session key so the renderer ignores stale updates.
+阶段更新包含源会话 key，确保渲染进程可以忽略过期更新。
 
-## User Interface
+## 用户界面
 
-The detail toolbar adds a `Migrate to…` action. The context menu exposes the same action.
+详情工具栏新增“迁移到…”操作，右键菜单提供相同入口。
 
-Selecting it opens a small target picker:
+点击后打开一个小型目标选择器：
 
 - Claude Code
 - Codex
 - CodeBuddy
 
-The source family is disabled. Unsupported and remote sessions show the action disabled with an explanatory tooltip.
+当前来源家族不可选择。不受支持的会话和远程会话禁用该操作，并通过 tooltip 说明原因。
 
-During migration, the action toast shows the current stage. On success it reports:
+迁移期间，操作提示展示当前阶段。成功后显示：
 
-- Target agent
-- Migration strategy
-- Target session ID
+- 目标 Agent
+- 迁移策略
+- 目标会话 ID
 
-If terminal launch fails, the result dialog provides a copyable resume command.
+如果终端启动失败，结果对话框提供可复制的 resume 命令。
 
-The UI does not expose compression thresholds or advanced writer settings in the first version.
+首版 UI 不暴露压缩阈值和高级写入器设置。
 
-## Security and Data Boundaries
+## 安全与数据边界
 
-- Do not copy source system/developer prompts into another agent.
-- Do not copy source permission settings or credentials.
-- Treat transcript content as untrusted input when generating an AI handoff.
-- Do not execute commands found in the transcript.
-- Preserve the existing read-only treatment of source session files.
-- Only write the newly created target session and the application's migration metadata.
+- 不把源会话的 System/Developer 提示复制到其他 Agent。
+- 不复制源权限设置或凭证。
+- 生成 AI 交接内容时，将会话正文视为不可信输入。
+- 不执行会话正文中出现的命令。
+- 保持现有源会话文件只读边界。
+- 只写入新创建的目标会话和应用迁移元数据。
 
-## Testing
+## 测试
 
-### Core Migration
+### 核心迁移
 
-- All six source/target directions.
-- Reject same-family migration.
-- Reject remote migration.
-- Reject unsupported source.
-- Reject missing target CLI.
-- Preserve project path, message order, roles, and Unicode content.
+- 覆盖全部 6 条源/目标路径。
+- 拒绝同家族迁移。
+- 拒绝远程迁移。
+- 拒绝不受支持的源。
+- 拒绝缺失目标 CLI 的迁移。
+- 保留项目路径、消息顺序、角色和 Unicode 内容。
 
-### Length Handling
+### 长度处理
 
-- Exact behavior immediately below and above 60,000 estimated tokens.
-- AI Provider success.
-- Missing Provider.
-- Timeout.
-- Invalid Provider response.
-- Local fallback keeps opening and closing context and marks omissions.
+- 验证 60,000 预估 token 阈值两侧的精确行为。
+- AI Provider 成功。
+- 未配置 Provider。
+- Provider 超时。
+- Provider 返回无效结果。
+- 本地降级保留开头和结尾上下文，并标记省略内容。
 
-### Writers
+### 写入器
 
-- Claude Code output can be read by the Claude loader.
-- Codex output can be read by the Codex loader.
-- CodeBuddy output can be read by the CodeBuddy loader.
-- IDs and parent chains are valid.
-- Title metadata is generated.
-- Temporary files are cleaned after failure.
-- Final installation uses an atomic rename.
+- Claude Code 输出可被 Claude 加载器重新读取。
+- Codex 输出可被 Codex 加载器重新读取。
+- CodeBuddy 输出可被 CodeBuddy 加载器重新读取。
+- ID 和父消息链合法。
+- 正确生成标题元数据。
+- 失败后清理临时文件。
+- 最终安装使用原子重命名。
 
-### Integration
+### 集成
 
-- IPC request and result types.
-- Progress events are routed to the correct session.
-- Successful migration refreshes the local index.
-- Terminal launch uses the configured target binary and default terminal.
-- Launch failure preserves the target session and returns the resume command.
+- IPC 请求与结果类型正确。
+- 进度事件路由到正确会话。
+- 迁移成功后刷新本地索引。
+- 使用已配置的目标二进制文件和默认终端启动。
+- 启动失败时保留目标会话并返回 resume 命令。
 
-### Renderer
+### 渲染进程
 
-- Detail action and context-menu action are wired.
-- Target picker disables the source family.
-- Remote sessions show the unsupported explanation.
-- Progress and completion messages show the selected strategy.
+- 详情操作和右键菜单操作正确接线。
+- 目标选择器禁用源家族。
+- 远程会话显示不支持原因。
+- 进度和完成消息显示所选迁移策略。
 
-## Documentation
+## 文档
 
-Update Chinese and English README files with:
+更新中英文 README，说明：
 
-- Supported migration matrix
-- Local-only limitation
-- 60k full-history threshold
-- AI compression and local fallback behavior
-- Data excluded from migration
-- Resume behavior after migration
+- 支持的迁移矩阵
+- 仅支持本地会话的限制
+- 60k 完整历史阈值
+- AI 压缩和本地降级行为
+- 不迁移的数据
+- 迁移完成后的 resume 行为
 
-## Out of Scope
+## 不在首版范围内
 
-- SSH remote migration
-- Migrating tool traces
-- Migrating images and attachments
-- Preserving model/provider configuration
-- Cross-machine migration
-- Automatically deleting prior migrated copies
-- User-configurable compression threshold
+- SSH 远程迁移
+- 迁移工具轨迹
+- 迁移图片和附件
+- 保留模型和 Provider 配置
+- 跨机器迁移
+- 自动删除此前迁移的副本
+- 用户自定义压缩阈值
