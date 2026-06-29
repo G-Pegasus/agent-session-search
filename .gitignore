@@ -8,3 +8,7 @@ dist/
 *.sqlite-wal
 *.db
 .worktrees/
+
+# 本地草稿与 vitest 临时时间戳
+km-推广文-重写版.md
+vitest.config.ts.timestamp-*
